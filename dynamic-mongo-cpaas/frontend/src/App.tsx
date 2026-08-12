@@ -1,7 +1,7 @@
-import React, { useState, useEffect, createContext } from 'react';
+import React, { useState, useEffect, useCallback, createContext } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Link2, LogOut, DatabaseZap } from 'lucide-react';
+import { LayoutDashboard, Link2, LogOut, DatabaseZap, ChevronDown, Check, Settings, Loader2 } from 'lucide-react';
 import { connectionService } from './services/api';
 import CollectionPage from './pages/CollectionPage';
 import ConnectionsPage from './pages/ConnectionsPage';
@@ -14,7 +14,20 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from './components/ui/sonner';
 import { Button } from './components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from './components/ui/dropdown-menu';
 import { cn } from './lib/utils';
+
+interface SavedConnection {
+  id: string;
+  alias: string;
+  database: string;
+}
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -31,6 +44,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [connectedDb, setConnectedDb] = useState<{ database: string; alias: string; id: string } | null>(null);
+  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   const handleLogout = async () => {
     await logout();
@@ -50,18 +65,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   };
 
-  const handleSwitchConnection = async (id: string) => {
+  const loadSavedConnections = useCallback(async () => {
     try {
-      await connectionService.switchConnection(id);
-      checkStatus();
+      const res = await connectionService.listConnections();
+      setSavedConnections(res.data.connections);
     } catch (err) {
       console.error(err);
+    }
+  }, []);
+
+  const handleSwitchConnection = async (id: string) => {
+    setSwitchingId(id);
+    try {
+      await connectionService.switchConnection(id);
+      await checkStatus();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSwitchingId(null);
     }
   };
 
   useEffect(() => {
     checkStatus();
   }, [location.pathname]);
+
+  useEffect(() => {
+    loadSavedConnections();
+  }, [loadSavedConnections, connectedDb?.id]);
 
   const contextValue = React.useMemo(
     () => ({
@@ -81,15 +112,54 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           Dynamic CPaaS Database
         </span>
         <div className="flex items-center gap-3 text-sm">
-          {connectedDb ? (
-            <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              DB: {connectedDb.database}
-            </span>
-          ) : (
-            <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">
-              Not connected
-            </span>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+                  connectedDb
+                    ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400'
+                    : 'bg-destructive/15 text-destructive hover:bg-destructive/25',
+                )}
+              >
+                {connectedDb ? `DB: ${connectedDb.database}` : 'Not connected'}
+                <ChevronDown className="size-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {savedConnections.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">No saved connections yet</div>
+              ) : (
+                savedConnections.map((conn) => {
+                  const isActive = connectedDb?.id === conn.id;
+                  return (
+                    <DropdownMenuItem
+                      key={conn.id}
+                      disabled={isActive || switchingId === conn.id}
+                      onClick={() => handleSwitchConnection(conn.id)}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium">{conn.alias || conn.database}</span>
+                        <span className="truncate text-xs text-muted-foreground">{conn.database}</span>
+                      </span>
+                      {switchingId === conn.id ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                      ) : isActive ? (
+                        <Check className="size-3.5 shrink-0 text-emerald-500" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  );
+                })
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/connections')} className="gap-2">
+                <Settings className="size-3.5" />
+                Manage connections
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {user && <span className="text-muted-foreground">{user.email}</span>}
           <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={handleLogout}>

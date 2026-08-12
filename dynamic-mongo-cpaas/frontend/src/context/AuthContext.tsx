@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { authService, setAccessToken, setOnAuthFailure } from '../services/api';
 
 interface User {
@@ -19,6 +19,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const bootstrapped = useRef(false);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
@@ -33,6 +34,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Silently re-establish a session on page load using the httpOnly refresh
     // cookie - the access token itself only ever lives in memory, so it's gone
     // on every reload and must be re-issued this way.
+    //
+    // Guarded with a ref because React StrictMode double-invokes effects in
+    // dev: without this, two /auth/refresh calls fire back-to-back with the
+    // same cookie, the second one finds the token the first just rotated away
+    // already revoked, and the reuse-detection logic (correctly, for a real
+    // replay) nukes the whole session - logging the user straight back out.
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+
     const bootstrap = async () => {
       try {
         const res = await authService.refresh();

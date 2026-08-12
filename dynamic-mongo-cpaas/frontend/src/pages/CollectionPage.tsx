@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X, Search } from 'lucide-react';
+import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -17,6 +17,7 @@ interface Field {
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SIZE = 25;
 
 const CollectionPage: React.FC = () => {
   const { collection } = useParams<{ collection: string }>();
@@ -26,10 +27,14 @@ const CollectionPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<any>(null);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Debounce the search box so every keystroke doesn't trigger a full
   // schema re-sample + document query round trip.
@@ -37,6 +42,12 @@ const CollectionPage: React.FC = () => {
     const handle = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchInput]);
+
+  // A new search or a switch to a different collection invalidates whatever
+  // page we were on - always land back on page 1 for the new result set.
+  useEffect(() => {
+    setPage(1);
+  }, [collection, search]);
 
   // The schema drawer is a fixed overlay - without this the page behind it
   // still scrolls, which reads as a bug (background content sliding under
@@ -54,10 +65,11 @@ const CollectionPage: React.FC = () => {
     try {
       const [schemaRes, docsRes] = await Promise.all([
         collectionService.getSchema(collection),
-        documentService.list(collection, 1, 25, search),
+        documentService.list(collection, page, PAGE_SIZE, search),
       ]);
       setFields(schemaRes.data.fields);
       setDocuments(docsRes.data.documents);
+      setTotal(docsRes.data.total);
     } catch (error) {
       console.error(error);
     } finally {
@@ -67,7 +79,7 @@ const CollectionPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [collection, search, connectedDb?.id]);
+  }, [collection, search, page, connectedDb?.id]);
 
   const handleCreate = () => {
     setEditingDoc(null);
@@ -83,7 +95,13 @@ const CollectionPage: React.FC = () => {
     if (!collection) return;
     if (window.confirm('Are you sure you want to delete this document?')) {
       await documentService.delete(collection, id);
-      loadData();
+      // Deleting the last row on a page beyond the first would otherwise leave
+      // the user stranded looking at an empty page.
+      if (documents.length === 1 && page > 1) {
+        setPage((p) => p - 1);
+      } else {
+        loadData();
+      }
     }
   };
 
@@ -207,6 +225,39 @@ const CollectionPage: React.FC = () => {
             </TableBody>
           </Table>
         </motion.div>
+      )}
+
+      {!loading && total > 0 && (
+        <div className="sticky bottom-0 z-10 -mt-px flex items-center justify-between gap-4 rounded-b-xl border bg-background/95 px-4 py-3 text-sm backdrop-blur-sm">
+          <p className="text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}</span>–
+            <span className="font-medium text-foreground">{Math.min(page * PAGE_SIZE, total)}</span> of{' '}
+            <span className="font-medium text-foreground">{total}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <span className="text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
       )}
 
       <DocumentForm
