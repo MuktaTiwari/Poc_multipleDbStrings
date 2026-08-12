@@ -5,6 +5,7 @@ import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X, Search, ChevronLeft,
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { collectionService, documentService } from '../services/api';
 import DocumentForm from '../components/DocumentForm';
 import FieldTypeBadge from '../components/FieldTypeBadge';
@@ -17,7 +18,7 @@ interface Field {
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 const CollectionPage: React.FC = () => {
   const { collection } = useParams<{ collection: string }>();
@@ -28,13 +29,19 @@ const CollectionPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<any>(null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+    setPage(1);
+  };
 
   // Debounce the search box so every keystroke doesn't trigger a full
   // schema re-sample + document query round trip.
@@ -65,7 +72,7 @@ const CollectionPage: React.FC = () => {
     try {
       const [schemaRes, docsRes] = await Promise.all([
         collectionService.getSchema(collection),
-        documentService.list(collection, page, PAGE_SIZE, search),
+        documentService.list(collection, page, pageSize, search),
       ]);
       setFields(schemaRes.data.fields);
       setDocuments(docsRes.data.documents);
@@ -79,7 +86,7 @@ const CollectionPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [collection, search, page, connectedDb?.id]);
+  }, [collection, search, page, pageSize, connectedDb?.id]);
 
   const handleCreate = () => {
     setEditingDoc(null);
@@ -138,8 +145,8 @@ const CollectionPage: React.FC = () => {
   if (!collection) return <p>No collection selected</p>;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="flex h-[calc(100vh-6.5rem)] flex-col">
+      <div className="mb-6 flex shrink-0 items-center justify-between">
         <h1 className="text-2xl font-semibold capitalize">{collection}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setSchemaOpen(true)}>
@@ -157,7 +164,7 @@ const CollectionPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="relative mb-4 w-72">
+      <div className="relative mb-4 w-72 shrink-0">
         <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search documents..."
@@ -177,10 +184,10 @@ const CollectionPage: React.FC = () => {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="min-w-0 overflow-hidden rounded-xl border"
+          className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border"
         >
-          <Table>
-            <TableHeader>
+          <Table wrapperClassName="flex-1 min-h-0">
+            <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
               <TableRow>
                 {fields.filter((f) => f.name !== '_id').map((f) => (
                   <TableHead key={f.name}>{f.name}</TableHead>
@@ -224,40 +231,57 @@ const CollectionPage: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </motion.div>
-      )}
 
-      {!loading && total > 0 && (
-        <div className="sticky bottom-0 z-10 -mt-px flex items-center justify-between gap-4 rounded-b-xl border bg-background/95 px-4 py-3 text-sm backdrop-blur-sm">
-          <p className="text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}</span>–
-            <span className="font-medium text-foreground">{Math.min(page * PAGE_SIZE, total)}</span> of{' '}
-            <span className="font-medium text-foreground">{total}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="size-4" />
-              Previous
-            </Button>
-            <span className="text-muted-foreground">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
+          {total > 0 && (
+            <div className="flex shrink-0 items-center justify-between gap-4 border-t bg-background/95 px-4 py-3 text-sm backdrop-blur-sm">
+              <div className="flex items-center gap-4">
+                <p className="text-muted-foreground">
+                  Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}</span>–
+                  <span className="font-medium text-foreground">{Math.min(page * pageSize, total)}</span> of{' '}
+                  <span className="font-medium text-foreground">{total}</span>
+                </p>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <span>Rows per page</span>
+                  <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={pageSize.toString()} />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      {[10, 25, 50, 100].map((size) => (
+                        <SelectItem key={size} value={size.toString()}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="size-4" />
+                  Previous
+                </Button>
+                <span className="text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </motion.div>
       )}
 
       <DocumentForm
@@ -280,7 +304,7 @@ const CollectionPage: React.FC = () => {
               onClick={() => setSchemaOpen(false)}
             />
             <motion.div
-              className="fixed top-0 right-0 z-50 flex h-full w-80 flex-col border-l bg-background p-6 shadow-xl"
+              className="fixed top-0 right-0 z-50 flex h-full w-100 flex-col border-l bg-background p-6 shadow-xl"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}

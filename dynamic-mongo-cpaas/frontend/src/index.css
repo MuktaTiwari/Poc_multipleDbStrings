@@ -103,3 +103,27 @@
     margin: 0;
   }
 }
+
+/* Global Thin Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  @apply bg-muted-foreground/30 transition-colors;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
