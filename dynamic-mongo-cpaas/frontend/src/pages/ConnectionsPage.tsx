@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, IconButton, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import PowerIcon from '@mui/icons-material/Power';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AddIcon from '@mui/icons-material/Add';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Copy, Power, CheckCircle2, Plus, Loader2 } from 'lucide-react';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
+import { Button } from '../components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../components/ui/tooltip';
 import { connectionService } from '../services/api';
 import { ConnectionContext } from '../App';
-import { useNavigate } from 'react-router-dom';
 import ConnectDatabase from '../components/ConnectDatabase';
 
 interface SavedConnection {
@@ -41,6 +41,7 @@ const ConnectionsPage: React.FC = () => {
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
   };
 
   const handleConnect = async (id: string) => {
@@ -57,102 +58,101 @@ const ConnectionsPage: React.FC = () => {
 
   const renderContent = () => {
     if (loading) {
-      return <Typography>Loading...</Typography>;
+      return <p className="text-sm text-muted-foreground">Loading...</p>;
     }
-    
+
     if (connections.length === 0) {
       return (
-        <Paper sx={{ p: 3, mt: 2 }}>
-          <Typography color="textSecondary">
+        <div className="mt-2 rounded-xl border p-6">
+          <p className="text-sm text-muted-foreground">
             No connections saved yet. Click "New Connection" to save a database URL.
-          </Typography>
-        </Paper>
+          </p>
+        </div>
       );
     }
 
     return (
-      <TableContainer component={Paper} sx={{ mt: 3 }}>
-        <Table aria-label="saved connections table">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>Alias</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Database Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>MongoDB URI</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+      <div className="mt-6 rounded-xl border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Alias</TableHead>
+              <TableHead>Database Name</TableHead>
+              <TableHead>MongoDB URI</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
             {connections.map((conn) => (
-              <TableRow key={conn.id} hover>
+              <TableRow key={conn.id}>
                 <TableCell>{conn.alias || '-'}</TableCell>
                 <TableCell>{conn.database}</TableCell>
                 <TableCell>
-                  <Box component="span" sx={{ 
-                    fontFamily: 'monospace', 
-                    bgcolor: 'rgba(255,255,255,0.05)', 
-                    p: 1, 
-                    borderRadius: 1,
-                    wordBreak: 'break-all',
-                    display: 'inline-block'
-                  }}>
+                  <span className="inline-block rounded bg-muted px-2 py-1 font-mono text-xs break-all">
                     {conn.uri}
-                  </Box>
+                  </span>
                 </TableCell>
-                <TableCell align="center">
-                  <Tooltip title="Copy URI">
-                    <IconButton onClick={() => handleCopy(conn.uri)}>
-                      <ContentCopyIcon />
-                    </IconButton>
-                  </Tooltip>
-                  {connectedDb?.id === conn.id ? (
-                    <Tooltip title="Currently Connected">
-                      <IconButton color="success" disabled>
-                        <CheckCircleIcon />
-                      </IconButton>
-                    </Tooltip>
-                  ) : (
-                    <Tooltip title="Connect to Database">
-                      <IconButton 
-                        color="primary" 
-                        onClick={() => handleConnect(conn.id)}
-                        disabled={connectingId === conn.id}
-                      >
-                        <PowerIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                <TableCell>
+                  <div className="flex items-center justify-center gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => handleCopy(conn.uri)}>
+                            <Copy className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Copy URI</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {connectedDb?.id === conn.id ? (
+                            <Button variant="ghost" size="icon" disabled className="text-green-500">
+                              <CheckCircle2 className="size-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleConnect(conn.id)}
+                              disabled={connectingId === conn.id}
+                            >
+                              {connectingId === conn.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Power className="size-4" />
+                              )}
+                            </Button>
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {connectedDb?.id === conn.id ? 'Currently connected' : 'Connect to database'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </div>
     );
   };
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: 'auto', mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4">
-          Saved Database Connections
-        </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => setConnectOpen(true)}
-        >
+    <div className="mx-auto mt-4 max-w-3xl">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Saved Database Connections</h1>
+        <Button onClick={() => setConnectOpen(true)}>
+          <Plus className="size-4" />
           New Connection
         </Button>
-      </Box>
-      
+      </div>
+
       {renderContent()}
 
-      <ConnectDatabase 
-        open={connectOpen} 
-        onClose={() => setConnectOpen(false)} 
-        onConnected={fetchConnections} 
-      />
-    </Box>
+      <ConnectDatabase open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={fetchConnections} />
+    </div>
   );
 };
 

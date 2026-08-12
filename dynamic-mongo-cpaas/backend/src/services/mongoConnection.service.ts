@@ -1,14 +1,7 @@
 import { MongoClient, Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
-dotenv.config();
-
-export interface SavedConnection {
-  id: string;
-  alias: string;
-  uri: string;
-  database: string;
-}
+import * as ConnectionRepository from '../repositories/connection.repository';
+import { SavedConnection } from '../models/connection.model';
 
 export interface ActiveConnection {
   client: MongoClient;
@@ -19,79 +12,50 @@ export interface ActiveConnection {
 }
 
 // Memory cache for active MongoDB clients
+// TODO production: replace this single-process client pool with a tenant-aware
+// connection manager (see mongoConnection.service.ts module docs / README).
 const clientPool = new Map<string, ActiveConnection>();
 let currentActiveId: string | null = null;
 
-// System DB connection for saving connections
-let systemClient: MongoClient | null = null;
-let systemDb: Db | null = null;
-
-const getSystemDb = async (): Promise<Db> => {
-  if (systemDb) return systemDb;
-  
-  const systemUri = process.env.SYSTEM_DB_URI;
-  if (!systemUri) {
-    throw new Error('SYSTEM_DB_URI environment variable is not defined.');
-  }
-
-  systemClient = new MongoClient(systemUri.trim());
-  await systemClient.connect();
-  
-  // Try to parse DB name from URI or fallback to a default
-  // Just relying on driver's default behavior, or explicitly forcing "system"
-  systemDb = systemClient.db(); 
-  return systemDb;
-};
+const sanitizeUri = (uri: string): string =>
+  uri
+    .trim()
+    .replace(/^["'“”]|["'“”]$/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '');
 
 export const getSavedConnections = async (): Promise<SavedConnection[]> => {
   try {
-    const db = await getSystemDb();
-    const connections = await db.collection('connections').find().toArray();
-    return connections.map(c => ({
-      id: c.id,
-      alias: c.alias,
-      uri: c.uri,
-      database: c.database
-    }));
+    return await ConnectionRepository.list();
   } catch (e) {
-    console.error("Error reading saved connections from System DB", e);
+    console.error('Error reading saved connections from System DB', e);
     return [];
   }
 };
 
 export const saveConnection = async (alias: string, uri: string, database: string): Promise<SavedConnection> => {
-  const cleanUri = uri.trim().replace(/^["'“”]|["'“”]$/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
-  const db = await getSystemDb();
-  const existing = await db.collection('connections').findOne({ uri: cleanUri, database });
-  
+  const cleanUri = sanitizeUri(uri);
+  const existing = await ConnectionRepository.findByUriAndDatabase(cleanUri, database);
   if (existing) {
-    return {
-      id: existing.id,
-      alias: existing.alias,
-      uri: existing.uri,
-      database: existing.database
-    };
+    return existing;
   }
 
-  const newConn: SavedConnection = {
-    id: uuidv4(),
-    alias,
-    uri: cleanUri,
-    database
-  };
-
-  await db.collection('connections').insertOne(newConn);
-  return newConn;
+  const newConnection: SavedConnection = { id: uuidv4(), alias, uri: cleanUri, database };
+  await ConnectionRepository.insert(newConnection);
+  return newConnection;
 };
 
 // Internal helper to establish a real connection
-const establishConnection = async (uri: string, databaseName: string, id: string, alias: string): Promise<ActiveConnection> => {
+const establishConnection = async (
+  uri: string,
+  databaseName: string,
+  id: string,
+  alias: string,
+): Promise<ActiveConnection> => {
   if (clientPool.has(id)) {
     return clientPool.get(id)!;
   }
 
-  const cleanUri = uri.trim().replace(/^["'“”]|["'“”]$/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
-  const client = new MongoClient(cleanUri);
+  const client = new MongoClient(sanitizeUri(uri));
   await client.connect();
   const db = client.db(databaseName);
   await db.command({ ping: 1 });
@@ -104,7 +68,7 @@ const establishConnection = async (uri: string, databaseName: string, id: string
 // Switch the globally active connection
 export const switchConnection = async (id: string): Promise<ActiveConnection> => {
   const connections = await getSavedConnections();
-  const saved = connections.find(c => c.id === id);
+  const saved = connections.find((c) => c.id === id);
   if (!saved) {
     throw new Error('Saved connection not found');
   }
@@ -115,9 +79,13 @@ export const switchConnection = async (id: string): Promise<ActiveConnection> =>
 };
 
 // Legacy connect support (from raw credentials), also saves it now
-export const connect = async (uri: string, databaseName: string, alias: string = 'My Database'): Promise<ActiveConnection> => {
+export const connect = async (
+  uri: string,
+  databaseName: string,
+  alias: string = 'My Database',
+): Promise<ActiveConnection> => {
   const saved = await saveConnection(alias, uri, databaseName);
-  return await switchConnection(saved.id);
+  return switchConnection(saved.id);
 };
 
 export const getConnection = (): ActiveConnection => {

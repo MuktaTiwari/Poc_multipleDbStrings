@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Switch, FormControlLabel } from '@mui/material';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Switch } from './ui/switch';
+import { Textarea } from './ui/textarea';
 
 interface Field {
   name: string;
@@ -40,7 +45,8 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ open, onClose, onSave, fiel
         const parsed = JSON.parse(rawJson);
         onSave(parsed);
       } catch (e) {
-        alert("Invalid JSON format");
+        console.error('Invalid JSON in document form:', e);
+        alert('Invalid JSON format');
       }
     } else {
       onSave(formData);
@@ -51,128 +57,118 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ open, onClose, onSave, fiel
     switch (field.type) {
       case 'string':
         return (
-          <TextField
-            key={path}
-            fullWidth
-            margin="normal"
-            label={field.name}
-            value={value || ''}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
+          <div key={path} className="flex flex-col gap-1.5">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Input id={path} value={value || ''} onChange={(e) => handleChange(field.name, e.target.value)} />
+          </div>
         );
       case 'number':
         return (
-          <TextField
-            key={path}
-            fullWidth
-            margin="normal"
-            label={field.name}
-            type="number"
-            value={value || ''}
-            onChange={(e) => handleChange(field.name, Number(e.target.value))}
-          />
+          <div key={path} className="flex flex-col gap-1.5">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Input
+              id={path}
+              type="number"
+              value={value ?? ''}
+              onChange={(e) => handleChange(field.name, Number(e.target.value))}
+            />
+          </div>
         );
       case 'boolean':
         return (
-          <FormControlLabel
-            key={path}
-            control={
-              <Switch
-                checked={!!value}
-                onChange={(e) => handleChange(field.name, e.target.checked)}
-              />
-            }
-            label={field.name}
-          />
+          <div key={path} className="flex items-center justify-between gap-2 py-1">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Switch id={path} checked={!!value} onCheckedChange={(checked) => handleChange(field.name, checked)} />
+          </div>
         );
       case 'date':
         return (
-          <TextField
-            key={path}
-            fullWidth
-            margin="normal"
-            label={field.name}
-            type="datetime-local"
-            value={value ? new Date(value).toISOString().slice(0, 16) : ''}
-            onChange={(e) => handleChange(field.name, new Date(e.target.value))}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+          <div key={path} className="flex flex-col gap-1.5">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Input
+              id={path}
+              type="datetime-local"
+              value={value ? new Date(value).toISOString().slice(0, 16) : ''}
+              onChange={(e) => handleChange(field.name, new Date(e.target.value))}
+            />
+          </div>
         );
       case 'object':
       case 'array':
         // For POC, simple text area for JSON
         return (
-          <TextField
-            key={path}
-            fullWidth
-            margin="normal"
-            label={field.name}
-            multiline
-            rows={4}
-            value={value ? JSON.stringify(value, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                handleChange(field.name, JSON.parse(e.target.value));
-              } catch (err) {
-                // allow typing invalid JSON temporarily?
-                handleChange(field.name, e.target.value); // Wait, this breaks parse on next render.
-                // Better to just store string in state if we want real editor, but for simple POC it's ok.
-              }
-            }}
-            helperText={`Enter valid JSON for ${field.type}`}
-          />
+          <div key={path} className="flex flex-col gap-1.5">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Textarea
+              id={path}
+              rows={4}
+              value={value ? JSON.stringify(value, null, 2) : ''}
+              onChange={(e) => {
+                try {
+                  handleChange(field.name, JSON.parse(e.target.value));
+                } catch (err) {
+                  // allow typing invalid JSON temporarily?
+                  handleChange(field.name, e.target.value); // Wait, this breaks parse on next render.
+                  // Better to just store string in state if we want real editor, but for simple POC it's ok.
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">Enter valid JSON for {field.type}</p>
+          </div>
         );
       default:
         // Ignore ObjectId in create/edit usually, or render readonly
         if (field.name === '_id') {
           return (
-             <TextField
-               key={path}
-               fullWidth
-               margin="normal"
-               label="_id (Read Only)"
-               value={value || ''}
-               disabled
-             />
+            <div key={path} className="flex flex-col gap-1.5">
+              <Label htmlFor={path}>_id (Read Only)</Label>
+              <Input id={path} value={value || ''} disabled />
+            </div>
           );
         }
         return (
-           <TextField
-             key={path}
-             fullWidth
-             margin="normal"
-             label={field.name}
-             value={value || ''}
-             onChange={(e) => handleChange(field.name, e.target.value)}
-           />
+          <div key={path} className="flex flex-col gap-1.5">
+            <Label htmlFor={path}>{field.name}</Label>
+            <Input id={path} value={value || ''} onChange={(e) => handleChange(field.name, e.target.value)} />
+          </div>
         );
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
-        {fields.length === 0 ? (
-          <TextField
-            autoFocus
-            margin="normal"
-            label="Raw JSON Document"
-            multiline
-            rows={10}
-            fullWidth
-            value={rawJson}
-            onChange={(e) => setRawJson(e.target.value)}
-            helperText="Since this collection has no existing schema, you can insert raw JSON."
-          />
-        ) : (
-          fields.map(field => renderField(field, formData[field.name], field.name))
-        )}
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto py-2">
+          {fields.length === 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="raw-json">Raw JSON Document</Label>
+              <Textarea
+                id="raw-json"
+                autoFocus
+                rows={10}
+                value={rawJson}
+                onChange={(e) => setRawJson(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Since this collection has no existing schema, you can insert raw JSON.
+              </p>
+            </div>
+          ) : (
+            fields.map((field) => renderField(field, formData[field.name], field.name))
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save</Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
-      </DialogActions>
     </Dialog>
   );
 };

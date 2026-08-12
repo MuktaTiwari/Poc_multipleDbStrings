@@ -1,16 +1,19 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { Box, Typography, Button, Paper,Dialog, DialogTitle, DialogContent, DialogActions, TextField, Card, CardContent, Grid } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ChevronRight, Database, Plus } from 'lucide-react';
 import { ConnectionContext } from '../App';
 import { collectionService } from '../services/api';
-import { useNavigate } from 'react-router-dom';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import StorageIcon from '@mui/icons-material/Storage';
-import AddIcon from '@mui/icons-material/Add';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 const DashboardPage: React.FC = () => {
   const { connectedDb } = useContext(ConnectionContext);
   const navigate = useNavigate();
-  const [collections, setCollections] = useState<{name: string}[]>([]);
+  const [collections, setCollections] = useState<{ name: string }[]>([]);
   const [createColOpen, setCreateColOpen] = useState(false);
   const [newColName, setNewColName] = useState('');
 
@@ -42,101 +45,92 @@ const DashboardPage: React.FC = () => {
 
   if (!connectedDb) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <StorageIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
-        <Typography variant="h5" color="textSecondary" gutterBottom>
-          No Active Database Connection
-        </Typography>
-        <Typography variant="body1" color="textSecondary" sx={{ mb: 4 }}>
-          Please connect to a database to view and manage collections.
-        </Typography>
-        <Button variant="contained" size="large" onClick={() => navigate('/connections')}>
+      <div className="flex h-[60vh] flex-col items-center justify-center text-center">
+        <Database className="mb-4 size-16 text-muted-foreground" />
+        <h2 className="mb-1 text-xl font-medium text-muted-foreground">No Active Database Connection</h2>
+        <p className="mb-6 text-muted-foreground">Please connect to a database to view and manage collections.</p>
+        <Button size="lg" onClick={() => navigate('/connections')}>
           Go to Connections
         </Button>
-      </Box>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ mx: 'auto', mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <StorageIcon fontSize="large" color="primary" />
+    <div className="mx-auto mt-4">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="mb-1 flex items-center gap-2 text-2xl font-semibold">
+            <Database className="size-6 text-primary" />
             Database: {connectedDb.database}
-          </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
-            Manage your collections and schemas dynamically.
-          </Typography>
-        </Box>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => setCreateColOpen(true)}
-          sx={{ borderRadius: 2 }}
-        >
+          </h1>
+          <p className="text-muted-foreground">Manage your collections and schemas dynamically.</p>
+        </div>
+        <Button onClick={() => setCreateColOpen(true)}>
+          <Plus className="size-4" />
           New Collection
         </Button>
-      </Box>
+      </div>
 
       {collections.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, bgcolor: 'background.paper' }}>
-          <Typography variant="h6" color="textSecondary" gutterBottom>
-            This database is empty.
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-            Create your first collection to start storing data.
-          </Typography>
-          <Button variant="outlined" onClick={() => setCreateColOpen(true)}>Create Collection</Button>
-        </Paper>
+        <div className="rounded-2xl border p-12 text-center">
+          <h3 className="mb-1 font-medium text-muted-foreground">This database is empty.</h3>
+          <p className="mb-4 text-sm text-muted-foreground">Create your first collection to start storing data.</p>
+          <Button variant="outline" onClick={() => setCreateColOpen(true)}>
+            Create Collection
+          </Button>
+        </div>
       ) : (
-        <Grid container spacing={3}>
-          {collections.map((col) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={col.name}>
-              <Card 
-                sx={{ 
-                  borderRadius: 3, 
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 },
-                  cursor: 'pointer',
-                  border: '1px solid rgba(255, 255, 255, 0.05)'
-                }}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+          {collections.map((col, index) => (
+            <motion.div
+              key={col.name}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.04 }}
+            >
+              <Card
+                className="cursor-pointer border-border/60 transition-transform hover:-translate-y-1 hover:shadow-md"
                 onClick={() => navigate(`/collections/${col.name}`)}
               >
-                <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(144, 202, 249, 0.1)' }}>
-                      <StorageIcon color="primary" />
-                    </Box>
-                    <Typography variant="h6">{col.name}</Typography>
-                  </Box>
-                  <ArrowForwardIosIcon fontSize="small" color="action" />
+                <CardContent className="flex items-center justify-between p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-primary/10 p-2.5">
+                      <Database className="size-5 text-primary" />
+                    </div>
+                    <span className="font-medium">{col.name}</span>
+                  </div>
+                  <ChevronRight className="size-4 text-muted-foreground" />
                 </CardContent>
               </Card>
-            </Grid>
+            </motion.div>
           ))}
-        </Grid>
+        </div>
       )}
 
-      <Dialog open={createColOpen} onClose={() => setCreateColOpen(false)}>
-        <DialogTitle>Create New Collection</DialogTitle>
+      <Dialog open={createColOpen} onOpenChange={setCreateColOpen}>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Collection Name"
-            fullWidth
-            variant="outlined"
-            value={newColName}
-            onChange={(e) => setNewColName(e.target.value)}
-          />
+          <DialogHeader>
+            <DialogTitle>Create New Collection</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-collection-name">Collection Name</Label>
+            <Input
+              id="new-collection-name"
+              autoFocus
+              value={newColName}
+              onChange={(e) => setNewColName(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateColOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCollection}>Create</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateColOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreateCollection} variant="contained">Create</Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 };
 

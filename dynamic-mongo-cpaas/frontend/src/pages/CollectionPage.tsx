@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams } from 'react-router-dom';
-import { 
-  Box, Typography, Button, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Paper, TextField, 
-  IconButton, CircularProgress, Drawer, List, ListItem, Divider
-} from '@mui/material';
-import { Edit, Delete, Refresh, Info as InfoIcon } from '@mui/icons-material';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X } from 'lucide-react';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { collectionService, documentService } from '../services/api';
 import DocumentForm from '../components/DocumentForm';
 import FieldTypeBadge from '../components/FieldTypeBadge';
@@ -17,17 +16,27 @@ interface Field {
   children?: Field[];
 }
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 const CollectionPage: React.FC = () => {
   const { collection } = useParams<{ collection: string }>();
   const { connectedDb } = useContext(ConnectionContext);
   const [fields, setFields] = useState<Field[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  
+
   const [formOpen, setFormOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<any>(null);
+
+  // Debounce the search box so every keystroke doesn't trigger a full
+  // schema re-sample + document query round trip.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
 
   const loadData = async () => {
     if (!collection) return;
@@ -35,7 +44,7 @@ const CollectionPage: React.FC = () => {
     try {
       const [schemaRes, docsRes] = await Promise.all([
         collectionService.getSchema(collection),
-        documentService.list(collection, 1, 25, search)
+        documentService.list(collection, 1, 25, search),
       ]);
       setFields(schemaRes.data.fields);
       setDocuments(docsRes.data.documents);
@@ -70,17 +79,17 @@ const CollectionPage: React.FC = () => {
 
   const handleSave = async (docData: any) => {
     if (!collection) return;
-    
+
     // Parse strings that should be JSON if they were typed as strings
     const processedData = { ...docData };
-    fields.forEach(f => {
-       if ((f.type === 'object' || f.type === 'array') && typeof processedData[f.name] === 'string') {
-         try {
-           processedData[f.name] = JSON.parse(processedData[f.name]);
-         } catch (e) {
-           // Keep as string if invalid, or ignore
-         }
-       }
+    fields.forEach((f) => {
+      if ((f.type === 'object' || f.type === 'array') && typeof processedData[f.name] === 'string') {
+        try {
+          processedData[f.name] = JSON.parse(processedData[f.name]);
+        } catch (e) {
+          // Keep as string if invalid, or ignore
+        }
+      }
     });
 
     if (editingDoc) {
@@ -98,71 +107,88 @@ const CollectionPage: React.FC = () => {
     return String(value);
   };
 
-  if (!collection) return <Typography>No collection selected</Typography>;
+  if (!collection) return <p>No collection selected</p>;
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{textTransform: 'capitalize'}}>{collection}</Typography>
-        <Box>
-          <Button startIcon={<InfoIcon />} onClick={() => setSchemaOpen(true)} sx={{ mr: 2 }}>
+    <div>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold capitalize">{collection}</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setSchemaOpen(true)}>
+            <Info className="size-4" />
             Schema Info
           </Button>
-          <Button startIcon={<Refresh />} onClick={loadData} sx={{ mr: 2 }}>Refresh</Button>
-          <Button variant="contained" color="primary" onClick={handleCreate}>+ Add Document</Button>
-        </Box>
-      </Box>
+          <Button variant="outline" onClick={loadData}>
+            <RefreshCw className="size-4" />
+            Refresh
+          </Button>
+          <Button onClick={handleCreate}>
+            <Plus className="size-4" />
+            Add Document
+          </Button>
+        </div>
+      </div>
 
-
-      <Box sx={{ mb: 2 }}>
-        <TextField 
-          label="Search documents..." 
-          variant="outlined" 
-          size="small" 
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          sx={{ width: 300 }}
+      <div className="mb-4">
+        <Input
+          placeholder="Search documents..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-72"
         />
-      </Box>
+      </div>
 
       {loading ? (
-        <CircularProgress />
+        <div className="flex justify-center py-10">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
       ) : (
-        <TableContainer component={Paper}>
+        <div className="rounded-xl border">
           <Table>
-            <TableHead>
+            <TableHeader>
               <TableRow>
-                {fields.filter(f => f.name !== '_id').map(f => (
-                  <TableCell key={f.name}>{f.name}</TableCell>
+                {fields.filter((f) => f.name !== '_id').map((f) => (
+                  <TableHead key={f.name}>{f.name}</TableHead>
                 ))}
-                <TableCell>Actions</TableCell>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
-              {documents.map(doc => (
+              {documents.map((doc) => (
                 <TableRow key={doc._id}>
-                  {fields.filter(f => f.name !== '_id').map(f => (
+                  {fields.filter((f) => f.name !== '_id').map((f) => (
                     <TableCell key={f.name}>{renderCellValue(doc[f.name])}</TableCell>
                   ))}
                   <TableCell>
-                    <IconButton size="small" onClick={() => handleEdit(doc)}><Edit /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(doc._id)}><Delete /></IconButton>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(doc)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(doc._id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {documents.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={fields.length + 1} align="center">
+                  <TableCell colSpan={fields.length + 1} className="text-center text-muted-foreground">
                     No documents found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+        </div>
       )}
 
-      <DocumentForm 
+      <DocumentForm
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSave={handleSave}
@@ -171,33 +197,50 @@ const CollectionPage: React.FC = () => {
         title={editingDoc ? 'Edit Document' : 'Create Document'}
       />
 
-      <Drawer anchor="right" open={schemaOpen} onClose={() => setSchemaOpen(false)}>
-        <Box sx={{ width: 300, p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Collection Schema
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-            Dynamically inferred from the latest documents in the collection.
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <List>
-            {fields.map(f => (
-              <ListItem key={f.name} disablePadding sx={{ mb: 2 }}>
-                <Box sx={{ width: '100%' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{f.name}</Typography>
-                    <FieldTypeBadge type={f.type} />
-                  </Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Detected as {f.type}
-                  </Typography>
-                </Box>
-              </ListItem>
-            ))}
-          </List>
-        </Box>
-      </Drawer>
-    </Box>
+      <AnimatePresence>
+        {schemaOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40 bg-black/50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSchemaOpen(false)}
+            />
+            <motion.div
+              className="fixed top-0 right-0 z-50 h-full w-80 border-l bg-background p-6 shadow-xl"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Collection Schema</h2>
+                <Button variant="ghost" size="icon" onClick={() => setSchemaOpen(false)}>
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Dynamically inferred from the latest documents in the collection.
+              </p>
+              <div className="border-t pt-4">
+                <ul className="flex flex-col gap-4">
+                  {fields.map((f) => (
+                    <li key={f.name}>
+                      <div className="mb-0.5 flex items-center justify-between">
+                        <span className="text-sm font-semibold">{f.name}</span>
+                        <FieldTypeBadge type={f.type} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Detected as {f.type}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

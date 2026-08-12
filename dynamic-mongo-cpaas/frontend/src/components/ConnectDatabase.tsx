@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Alert, CircularProgress, Typography } from '@mui/material';
+import { toast } from 'sonner';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { connectionService } from '../services/api';
 
 interface ConnectDatabaseProps {
@@ -38,6 +43,7 @@ const ConnectDatabase: React.FC<ConnectDatabaseProps> = ({ open, onClose, onConn
     setSuccess(null);
     try {
       await connectionService.connect(mongoUri, database, alias);
+      toast.success('Database connected', { description: database });
       onConnected();
       onClose();
     } catch (err: any) {
@@ -48,52 +54,69 @@ const ConnectDatabase: React.FC<ConnectDatabaseProps> = ({ open, onClose, onConn
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Connect MongoDB</DialogTitle>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
-        <TextField
-          fullWidth
-          margin="normal"
-          label="MongoDB URI"
-          value={mongoUri}
-          onChange={e => setMongoUri(e.target.value)}
-          disabled={loading}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Connection Alias (e.g., Prod DB)"
-          value={alias}
-          onChange={e => setAlias(e.target.value)}
-          disabled={loading}
-        />
-        <TextField
-          fullWidth
-          margin="normal"
-          label="Database Name"
-          value={database}
-          onChange={e => setDatabase(e.target.value)}
-          disabled={loading}
-        />
+        <DialogHeader>
+          <DialogTitle>Connect MongoDB</DialogTitle>
+        </DialogHeader>
 
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-        {success && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            <Typography variant="body2">{success}</Typography>
-            <Typography variant="body2">Database: {database}</Typography>
-            <Typography variant="body2">Collections found: {collectionsFound}</Typography>
-          </Alert>
-        )}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-uri">MongoDB URI</Label>
+            <Input
+              id="mongo-uri"
+              placeholder="mongodb+srv://..."
+              value={mongoUri}
+              onChange={(e) => setMongoUri(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-alias">Connection Alias (e.g., Prod DB)</Label>
+            <Input id="mongo-alias" value={alias} onChange={(e) => setAlias(e.target.value)} disabled={loading} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mongo-database">Database Name</Label>
+            <Input
+              id="mongo-database"
+              value={database}
+              onChange={(e) => setDatabase(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="flex flex-col gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm">
+              <span className="flex items-center gap-2 font-medium text-green-600 dark:text-green-400">
+                <CheckCircle2 className="size-4" /> {success}
+              </span>
+              <span className="text-muted-foreground">Database: {database}</span>
+              <span className="text-muted-foreground">Collections found: {collectionsFound}</span>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="secondary" onClick={handleTest} disabled={loading}>
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            Test Connection
+          </Button>
+          <Button onClick={handleConnect} disabled={loading}>
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            Connect
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button onClick={handleTest} disabled={loading} color="secondary">
-          {loading ? <CircularProgress size={24} /> : 'Test Connection'}
-        </Button>
-        <Button onClick={handleConnect} disabled={loading} variant="contained" color="primary">
-          Connect
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };
