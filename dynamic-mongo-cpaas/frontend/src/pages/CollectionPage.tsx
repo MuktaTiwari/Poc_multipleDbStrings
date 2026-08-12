@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom';
 import { 
   Box, Typography, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, TextField, 
-  IconButton, CircularProgress 
+  IconButton, CircularProgress, Drawer, List, ListItem, Divider
 } from '@mui/material';
-import { Edit, Delete, Refresh } from '@mui/icons-material';
+import { Edit, Delete, Refresh, Info as InfoIcon } from '@mui/icons-material';
 import { collectionService, documentService } from '../services/api';
 import DocumentForm from '../components/DocumentForm';
 import FieldTypeBadge from '../components/FieldTypeBadge';
@@ -26,6 +26,7 @@ const CollectionPage: React.FC = () => {
   const [search, setSearch] = useState('');
   
   const [formOpen, setFormOpen] = useState(false);
+  const [schemaOpen, setSchemaOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<any>(null);
 
   const loadData = async () => {
@@ -104,22 +105,14 @@ const CollectionPage: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{textTransform: 'capitalize'}}>{collection}</Typography>
         <Box>
+          <Button startIcon={<InfoIcon />} onClick={() => setSchemaOpen(true)} sx={{ mr: 2 }}>
+            Schema Info
+          </Button>
           <Button startIcon={<Refresh />} onClick={loadData} sx={{ mr: 2 }}>Refresh</Button>
           <Button variant="contained" color="primary" onClick={handleCreate}>+ Add Document</Button>
         </Box>
       </Box>
 
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Detected Fields</Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-          {fields.map(f => (
-            <Box key={f.name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2">{f.name}</Typography>
-              <FieldTypeBadge type={f.type} />
-            </Box>
-          ))}
-        </Box>
-      </Box>
 
       <Box sx={{ mb: 2 }}>
         <TextField 
@@ -177,6 +170,33 @@ const CollectionPage: React.FC = () => {
         initialData={editingDoc}
         title={editingDoc ? 'Edit Document' : 'Create Document'}
       />
+
+      <Drawer anchor="right" open={schemaOpen} onClose={() => setSchemaOpen(false)}>
+        <Box sx={{ width: 300, p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Collection Schema
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+            Dynamically inferred from the latest documents in the collection.
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <List>
+            {fields.map(f => (
+              <ListItem key={f.name} disablePadding sx={{ mb: 2 }}>
+                <Box sx={{ width: '100%' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{f.name}</Typography>
+                    <FieldTypeBadge type={f.type} />
+                  </Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Detected as {f.type}
+                  </Typography>
+                </Box>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

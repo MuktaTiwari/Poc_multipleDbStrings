@@ -17,6 +17,7 @@ export const connectionService = {
 export const collectionService = {
   list: () => api.get('/collections'),
   getSchema: (collection: string) => api.get(`/collections/${collection}/schema`),
+  create: (name: string) => api.post('/collections', { name }),
 };
 
 export const documentService = {

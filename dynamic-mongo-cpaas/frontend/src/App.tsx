@@ -1,10 +1,12 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Drawer, List, ListItem, ListItemButton, ListItemText, Typography, Button, AppBar, Toolbar, CssBaseline, ThemeProvider, createTheme, Select, MenuItem, FormControl } from '@mui/material';
-import { connectionService, collectionService } from './services/api';
-import ConnectDatabase from './components/ConnectDatabase';
+import { Box, Drawer, List, ListItem, ListItemButton, ListItemText, Typography, AppBar, Toolbar, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { connectionService } from './services/api';
 import CollectionPage from './pages/CollectionPage';
 import ConnectionsPage from './pages/ConnectionsPage';
+import DashboardPage from './pages/DashboardPage';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import LinkIcon from '@mui/icons-material/Link';
 const drawerWidth = 240;
 
 const darkTheme = createTheme({
@@ -20,45 +22,24 @@ const darkTheme = createTheme({
 });
 
 export const ConnectionContext = createContext<{
-  connectedDb: {database: string, alias: string, id: string} | null;
-}>({ connectedDb: null });
+  connectedDb: { database: string, alias: string, id: string } | null;
+  switchConnection: (id: string) => Promise<void>;
+}>({ connectedDb: null, switchConnection: async () => { } });
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [connectOpen, setConnectOpen] = useState(false);
-  const [collections, setCollections] = useState<{name: string}[]>([]);
-  const [connectedDb, setConnectedDb] = useState<{database: string, alias: string, id: string} | null>(null);
-  const [savedConnections, setSavedConnections] = useState<any[]>([]);
+  const [connectedDb, setConnectedDb] = useState<{ database: string, alias: string, id: string } | null>(null);
+  //const [savedConnections, setSavedConnections] = useState<any[]>([]);
 
   const checkStatus = async () => {
     try {
       const res = await connectionService.getStatus();
       if (res.data.connected) {
         setConnectedDb({ database: res.data.database, alias: res.data.alias, id: res.data.id });
-        loadCollections();
       } else {
         setConnectedDb(null);
-        setCollections([]);
       }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadCollections = async () => {
-    try {
-      const res = await collectionService.list();
-      setCollections(res.data.collections);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadSavedConnections = async () => {
-    try {
-      const res = await connectionService.listConnections();
-      setSavedConnections(res.data.connections);
     } catch (err) {
       console.error(err);
     }
@@ -75,8 +56,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     checkStatus();
-    loadSavedConnections();
-  }, [connectOpen]);
+  }, [location.pathname]);
+
+  const contextValue = React.useMemo(() => ({
+    connectedDb,
+    switchConnection: handleSwitchConnection
+  }), [connectedDb]);
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -86,21 +71,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Dynamic CPaaS Database
           </Typography>
-          {savedConnections.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 150, mr: 2 }}>
-              <Select
-                value={connectedDb ? connectedDb.id : ''}
-                displayEmpty
-                onChange={(e) => handleSwitchConnection(e.target.value as string)}
-                sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' } }}
-              >
-                <MenuItem value="" disabled>Select Connection...</MenuItem>
-                {savedConnections.map(conn => (
-                  <MenuItem key={conn.id} value={conn.id}>{conn.alias || conn.database}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
           {connectedDb ? (
             <Typography variant="body2" sx={{ mr: 2 }}>DB: {connectedDb.database}</Typography>
           ) : (
@@ -117,56 +87,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }}
       >
         <Toolbar />
-        <Box sx={{ overflow: 'auto', p: 2 }}>
-          <Typography variant="overline" color="textSecondary">Collections</Typography>
+        <Box sx={{ overflow: 'auto', p: 2, mt: 2 }}>
           <List>
-            {collections.map((col) => (
-              <ListItem key={col.name} disablePadding>
-                <ListItemButton 
-                  selected={location.pathname === `/collections/${col.name}`}
-                  onClick={() => navigate(`/collections/${col.name}`)}
-                >
-                  <ListItemText primary={col.name} />
-                </ListItemButton>
-              </ListItem>
-            ))}
+            <ListItem disablePadding>
+              <ListItemButton
+                selected={location.pathname === '/'}
+                onClick={() => navigate('/')}
+                sx={{ borderRadius: 2, mb: 1 }}
+              >
+                <DashboardIcon sx={{ mr: 2, color: location.pathname === '/' ? 'primary.main' : 'inherit' }} />
+                <ListItemText primary="Dashboard" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                selected={location.pathname === '/connections'}
+                onClick={() => navigate('/connections')}
+                sx={{ borderRadius: 2 }}
+              >
+                <LinkIcon sx={{ mr: 2, color: location.pathname === '/connections' ? 'primary.main' : 'inherit' }} />
+                <ListItemText primary="Connections" />
+              </ListItemButton>
+            </ListItem>
           </List>
-          <Button 
-            variant="outlined" 
-            fullWidth 
-            sx={{ mt: 2 }}
-            onClick={() => setConnectOpen(true)}
-          >
-            + Connect
-          </Button>
-          <Button 
-            variant="text" 
-            fullWidth 
-            sx={{ mt: 1 }}
-            onClick={() => navigate('/connections')}
-          >
-            View Saved URLs
-          </Button>
         </Box>
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar />
-        <ConnectionContext.Provider value={{ connectedDb }}>
+        <ConnectionContext.Provider value={contextValue}>
           {children}
         </ConnectionContext.Provider>
       </Box>
-      <ConnectDatabase 
-        open={connectOpen} 
-        onClose={() => setConnectOpen(false)} 
-        onConnected={checkStatus} 
-      />
     </Box>
   );
 };
-
-const Dashboard = () => (
-  <Typography variant="h5">Welcome to Dynamic CPaaS. Please connect a database or select a collection.</Typography>
-);
 
 const App: React.FC = () => {
   return (
@@ -174,7 +128,7 @@ const App: React.FC = () => {
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<DashboardPage />} />
             <Route path="/connections" element={<ConnectionsPage />} />
             <Route path="/collections/:collection" element={<CollectionPage />} />
           </Routes>

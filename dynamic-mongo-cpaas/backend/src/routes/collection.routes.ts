@@ -5,6 +5,7 @@ import documentRoutes from './document.routes';
 const router = Router();
 
 router.get('/', CollectionController.listCollections);
+router.post('/', CollectionController.createCollection);
 router.get('/:collection/schema', CollectionController.getCollectionSchema);
 
 // Nest document routes under collections

@@ -18,12 +18,15 @@ interface DocumentFormProps {
 
 const DocumentForm: React.FC<DocumentFormProps> = ({ open, onClose, onSave, fields, initialData, title }) => {
   const [formData, setFormData] = useState<any>({});
+  const [rawJson, setRawJson] = useState<string>('');
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
+      setRawJson(JSON.stringify(initialData, null, 2));
     } else {
       setFormData({});
+      setRawJson('{\n  \n}');
     }
   }, [initialData, open]);
 
@@ -32,7 +35,16 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ open, onClose, onSave, fiel
   };
 
   const handleSave = () => {
-    onSave(formData);
+    if (fields.length === 0) {
+      try {
+        const parsed = JSON.parse(rawJson);
+        onSave(parsed);
+      } catch (e) {
+        alert("Invalid JSON format");
+      }
+    } else {
+      onSave(formData);
+    }
   };
 
   const renderField = (field: Field, value: any, path: string) => {
@@ -141,7 +153,21 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ open, onClose, onSave, fiel
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        {fields.map(field => renderField(field, formData[field.name], field.name))}
+        {fields.length === 0 ? (
+          <TextField
+            autoFocus
+            margin="normal"
+            label="Raw JSON Document"
+            multiline
+            rows={10}
+            fullWidth
+            value={rawJson}
+            onChange={(e) => setRawJson(e.target.value)}
+            helperText="Since this collection has no existing schema, you can insert raw JSON."
+          />
+        ) : (
+          fields.map(field => renderField(field, formData[field.name], field.name))
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
