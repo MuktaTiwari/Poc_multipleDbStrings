@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X } from 'lucide-react';
+import { Pencil, Trash2, RefreshCw, Info, Plus, Loader2, X, Search } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -37,6 +37,16 @@ const CollectionPage: React.FC = () => {
     const handle = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchInput]);
+
+  // The schema drawer is a fixed overlay - without this the page behind it
+  // still scrolls, which reads as a bug (background content sliding under
+  // an open panel).
+  useEffect(() => {
+    document.body.style.overflow = schemaOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [schemaOpen]);
 
   const loadData = async () => {
     if (!collection) return;
@@ -129,21 +139,28 @@ const CollectionPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="relative mb-4 w-72">
+        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search documents..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="w-72"
+          className="pl-9"
         />
       </div>
 
       {loading ? (
         <div className="flex justify-center py-10">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="rounded-xl border">
+        <motion.div
+          key={`${collection}-${search}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="min-w-0 overflow-hidden rounded-xl border"
+        >
           <Table>
             <TableHeader>
               <TableRow>
@@ -157,7 +174,11 @@ const CollectionPage: React.FC = () => {
               {documents.map((doc) => (
                 <TableRow key={doc._id}>
                   {fields.filter((f) => f.name !== '_id').map((f) => (
-                    <TableCell key={f.name}>{renderCellValue(doc[f.name])}</TableCell>
+                    <TableCell key={f.name}>
+                      <span className="block max-w-[260px] truncate" title={renderCellValue(doc[f.name])}>
+                        {renderCellValue(doc[f.name])}
+                      </span>
+                    </TableCell>
                   ))}
                   <TableCell>
                     <div className="flex gap-1">
@@ -185,7 +206,7 @@ const CollectionPage: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </div>
+        </motion.div>
       )}
 
       <DocumentForm
@@ -208,14 +229,19 @@ const CollectionPage: React.FC = () => {
               onClick={() => setSchemaOpen(false)}
             />
             <motion.div
-              className="fixed top-0 right-0 z-50 h-full w-80 border-l bg-background p-6 shadow-xl"
+              className="fixed top-0 right-0 z-50 flex h-full w-80 flex-col border-l bg-background p-6 shadow-xl"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
               <div className="mb-1 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Collection Schema</h2>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-fuchsia-500 text-primary-foreground">
+                    <Info className="size-4" />
+                  </span>
+                  Collection Schema
+                </h2>
                 <Button variant="ghost" size="icon" onClick={() => setSchemaOpen(false)}>
                   <X className="size-4" />
                 </Button>
@@ -223,16 +249,22 @@ const CollectionPage: React.FC = () => {
               <p className="mb-4 text-sm text-muted-foreground">
                 Dynamically inferred from the latest documents in the collection.
               </p>
-              <div className="border-t pt-4">
-                <ul className="flex flex-col gap-4">
-                  {fields.map((f) => (
-                    <li key={f.name}>
+              <div className="flex-1 overflow-y-auto border-t pt-4">
+                <ul className="flex flex-col gap-3">
+                  {fields.map((f, index) => (
+                    <motion.li
+                      key={f.name}
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="rounded-lg border bg-card/50 p-3"
+                    >
                       <div className="mb-0.5 flex items-center justify-between">
                         <span className="text-sm font-semibold">{f.name}</span>
                         <FieldTypeBadge type={f.type} />
                       </div>
                       <p className="text-xs text-muted-foreground">Detected as {f.type}</p>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               </div>

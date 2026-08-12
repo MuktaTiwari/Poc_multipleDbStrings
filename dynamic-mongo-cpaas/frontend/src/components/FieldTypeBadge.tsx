@@ -11,7 +11,8 @@ const VARIANT_BY_TYPE: Record<string, NonNullable<BadgeProps['variant']>> = {
   boolean: 'green',
   date: 'amber',
   object: 'slate',
-  array: 'outline',
+  array: 'cyan',
+  ObjectId: 'rose',
 };
 
 const FieldTypeBadge: React.FC<FieldTypeBadgeProps> = ({ type }) => (

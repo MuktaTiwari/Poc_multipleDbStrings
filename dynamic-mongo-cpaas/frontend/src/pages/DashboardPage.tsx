@@ -10,6 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
+const CARD_GRADIENTS = [
+  'from-primary to-fuchsia-500',
+  'from-cyan-500 to-blue-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-rose-500 to-pink-600',
+];
+
 const DashboardPage: React.FC = () => {
   const { connectedDb } = useContext(ConnectionContext);
   const navigate = useNavigate();
@@ -90,17 +98,19 @@ const DashboardPage: React.FC = () => {
               transition={{ delay: index * 0.04 }}
             >
               <Card
-                className="cursor-pointer border-border/60 transition-transform hover:-translate-y-1 hover:shadow-md"
+                className="group cursor-pointer border-border/60 transition-transform hover:-translate-y-1 hover:shadow-md"
                 onClick={() => navigate(`/collections/${col.name}`)}
               >
                 <CardContent className="flex items-center justify-between p-5">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2.5">
-                      <Database className="size-5 text-primary" />
+                    <div
+                      className={`flex size-10 items-center justify-center rounded-lg bg-gradient-to-br ${CARD_GRADIENTS[index % CARD_GRADIENTS.length]} text-white shadow-sm`}
+                    >
+                      <Database className="size-5" />
                     </div>
                     <span className="font-medium">{col.name}</span>
                   </div>
-                  <ChevronRight className="size-4 text-muted-foreground" />
+                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </CardContent>
               </Card>
             </motion.div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Link2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Link2, LogOut, DatabaseZap } from 'lucide-react';
 import { connectionService } from './services/api';
 import CollectionPage from './pages/CollectionPage';
 import ConnectionsPage from './pages/ConnectionsPage';
@@ -9,7 +9,9 @@ import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RequireAuth from './components/RequireAuth';
+import ThemeToggle from './components/ThemeToggle';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from './components/ui/sonner';
 import { Button } from './components/ui/button';
 import { cn } from './lib/utils';
@@ -72,14 +74,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="flex min-h-svh">
       <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md">
-        <span className="text-lg font-semibold">Dynamic CPaaS Database</span>
+        <span className="flex items-center gap-2 text-lg font-semibold">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-fuchsia-500 text-primary-foreground">
+            <DatabaseZap className="size-4" />
+          </span>
+          Dynamic CPaaS Database
+        </span>
         <div className="flex items-center gap-3 text-sm">
           {connectedDb ? (
-            <span className="text-muted-foreground">DB: {connectedDb.database}</span>
+            <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              DB: {connectedDb.database}
+            </span>
           ) : (
-            <span className="text-destructive">Not connected</span>
+            <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">
+              Not connected
+            </span>
           )}
           {user && <span className="text-muted-foreground">{user.email}</span>}
+          <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="size-4" />
             Logout
@@ -116,8 +128,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </nav>
       </aside>
 
-      <main className="ml-60 flex-1 pt-14">
-        <div className="p-6">
+      <main className="ml-60 min-w-0 flex-1 pt-14">
+        <div className="min-w-0 p-6">
           <ConnectionContext.Provider value={contextValue}>{children}</ConnectionContext.Provider>
         </div>
       </main>
@@ -139,16 +151,18 @@ const AppShell: React.FC = () => (
 
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Toaster />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/*" element={<AppShell />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <Toaster />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/*" element={<AppShell />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 };
 
