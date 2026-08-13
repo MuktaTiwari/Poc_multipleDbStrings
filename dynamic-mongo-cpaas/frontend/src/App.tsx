@@ -74,11 +74,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, []);
 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const handleSwitchConnection = async (id: string) => {
     setSwitchingId(id);
     try {
       await connectionService.switchConnection(id);
       await checkStatus();
+      if (location.pathname.startsWith('/collections/')) {
+        navigate('/');
+      }
+      setIsDropdownOpen(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -112,7 +118,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           Dynamic CPaaS Database
         </span>
         <div className="flex items-center gap-3 text-sm">
-          <DropdownMenu>
+          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
@@ -136,7 +142,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <DropdownMenuItem
                       key={conn.id}
                       disabled={isActive || switchingId === conn.id}
-                      onClick={() => handleSwitchConnection(conn.id)}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        handleSwitchConnection(conn.id);
+                      }}
                       className="flex items-center justify-between gap-2"
                     >
                       <span className="flex min-w-0 flex-col">
